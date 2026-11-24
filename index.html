@@ -6470,6 +6470,130 @@ const E = (function () {
 })();
 </script>
 
+<!-- 홈 화면 앱 설치 안내 -->
+<style>
+  .pwa-btn { position: fixed; z-index: 9600; top: calc(env(safe-area-inset-top, 0px) + 10px); right: calc(env(safe-area-inset-right, 0px) + 10px);
+    display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 999px; border: 2px solid #e2b65e;
+    background: linear-gradient(180deg, #1d4fb8, #102f78); color: #fff; font: 800 14px/1.2 'Noto Sans KR', system-ui, sans-serif;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .45), 0 0 12px rgba(90, 150, 255, .35); cursor: pointer; }
+  .pwa-btn[hidden] { display: none !important; }
+  .pwa-guide { position: fixed; inset: 0; z-index: 9700; display: grid; place-items: center; padding: 16px; background: rgba(4, 10, 30, .72); }
+  .pwa-guide[hidden] { display: none !important; }
+  .pwa-card { width: min(420px, 100%); max-height: 90vh; overflow: auto; border-radius: 16px; border: 2px solid #e2b65e; background: linear-gradient(180deg, #13296a, #0a1740);
+    color: #f5f1e8; padding: 18px 18px 16px; font: 15px/1.6 'Noto Sans KR', system-ui, sans-serif; box-shadow: 0 10px 40px rgba(0, 0, 0, .6); word-break: keep-all; }
+  .pwa-card h2 { margin: 0 0 8px; font-size: 19px; color: #f6d47c; }
+  .pwa-card ol { margin: 8px 0 10px; padding-left: 22px; } .pwa-card li { margin: 4px 0; }
+  .pwa-card b { color: #f6d47c; }
+  .pwa-card .warn { padding: 8px 10px; border-radius: 10px; background: rgba(255, 190, 80, .14); border: 1px solid rgba(246, 212, 124, .5); }
+  .pwa-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .pwa-row button, .pwa-row a { flex: 1 1 auto; min-height: 42px; border-radius: 10px; border: 1.5px solid #e2b65e; background: #1b3f9a; color: #fff;
+    font: 700 14px/1 'Noto Sans KR', system-ui, sans-serif; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; padding: 0 12px; cursor: pointer; }
+  .pwa-row .sec { background: transparent; }
+  .pwa-url { margin-top: 8px; font-size: 12px; color: #c9d1ea; word-break: break-all; user-select: all; }
+</style>
+<button type="button" class="pwa-btn" id="pwaBtn" hidden>📲 <span id="pwaBtnText">앱으로 설치</span></button>
+<div class="pwa-guide" id="pwaGuide" role="dialog" aria-modal="true" aria-labelledby="pwaTitle" hidden>
+  <div class="pwa-card"><h2 id="pwaTitle">홈 화면에 앱으로 설치</h2><div id="pwaBody"></div>
+    <div class="pwa-row" id="pwaActions"></div>
+    <p class="pwa-url" id="pwaUrl"></p>
+  </div>
+</div>
+<script>
+(() => {
+  const ua = navigator.userAgent;
+  const isIOS = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/i.test(ua);
+  const isKakao = /KAKAOTALK/i.test(ua);
+  const inApp = isKakao || /NAVER\(inapp|Instagram|FBAN|FBAV|FB_IAB|Line\/|DaumApps|BAND\/|everytimeApp|; wv\)/i.test(ua);
+  const isSamsung = /SamsungBrowser/i.test(ua);
+  const isIOSSafari = isIOS && /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS|Whale|NAVER|KAKAOTALK/i.test(ua);
+  const standalone = () => matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches || navigator.standalone === true;
+  const mobile = isIOS || isAndroid;
+  const url = location.href.split('#')[0];
+  const $ = (id) => document.getElementById(id);
+  const btn = $('pwaBtn'), guide = $('pwaGuide');
+  let deferred = null, installed = false;
+
+  addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferred = e; sync(); });
+  addEventListener('appinstalled', () => { installed = true; deferred = null; close(); sync(); });
+
+  function onSplash() { const el = $('intro'); return !!el && !el.hidden; }
+  function sync() {
+    const show = !standalone() && !installed && (onSplash() || inApp) && (mobile || deferred);
+    btn.hidden = !show;
+    const hint = $('splashAudioHint');                 // 자동 재생 안내 띠가 떠 있으면 그 아래로 비켜 섬
+    btn.style.top = hint && !hint.hidden && onSplash() ? 'calc(env(safe-area-inset-top, 0px) + ' + (hint.getBoundingClientRect().bottom + 8) + 'px)' : '';
+    $('pwaBtnText').textContent = inApp ? (isKakao || isAndroid ? '브라우저로 열어 설치' : '사파리로 열어 설치') : '앱으로 설치';
+  }
+  const intro = $('intro');
+  if (intro) new MutationObserver(sync).observe(intro, { attributes: true, attributeFilter: ['hidden'] });
+  const hintEl = $('splashAudioHint');
+  if (hintEl) new MutationObserver(sync).observe(hintEl, { attributes: true, attributeFilter: ['hidden'] });
+  addEventListener('resize', sync);
+
+  function openExternal() {
+    if (isKakao) { location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(url); return true; }
+    if (isAndroid) { location.href = 'intent://' + url.replace(/^https?:\/\//, '') + '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent(url) + ';end'; return true; }
+    return false;
+  }
+  async function copyLink(b) {
+    try { await navigator.clipboard.writeText(url); b.textContent = '복사했습니다 ✓'; }
+    catch (e) { const r = document.createRange(); r.selectNodeContents($('pwaUrl')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); b.textContent = '주소를 길게 눌러 복사하세요'; }
+  }
+  function show(html, actions) {
+    $('pwaBody').innerHTML = html;
+    const row = $('pwaActions'); row.innerHTML = '';
+    for (const [label, fn, cls] of actions) { const b = document.createElement('button'); b.type = 'button'; b.textContent = label; if (cls) b.className = cls; b.onclick = () => fn(b); row.appendChild(b); }
+    $('pwaUrl').textContent = url;
+    guide.hidden = false;
+  }
+  function close() { guide.hidden = true; }
+  guide.addEventListener('click', (e) => { if (e.target === guide) close(); });
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && !guide.hidden) close(); });
+
+  const closeBtn = ['닫기', close, 'sec'];
+  const copyBtn = ['주소 복사', copyLink, 'sec'];
+
+  btn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (deferred) {                                   // 크롬·엣지·삼성 인터넷: 바로 설치 창
+      deferred.prompt();
+      const r = await deferred.userChoice.catch(() => null);
+      deferred = null; sync();
+      if (r && r.outcome === 'accepted') show('<p>설치를 시작했습니다. 잠시 뒤 홈 화면에 <b>사방진</b> 아이콘이 생깁니다.</p>', [closeBtn]);
+      return;
+    }
+    if (inApp) {                                      // 카카오톡·네이버 등 앱 안 브라우저: 설치 불가 → 바깥 브라우저로
+      if (isIOS) {
+        show('<p class="warn">지금은 <b>' + (isKakao ? '카카오톡' : '앱') + ' 안의 화면</b>이라 설치할 수 없습니다.</p><ol>' +
+          (isKakao ? '<li>오른쪽 아래 <b>공유(↗) 또는 ⋯ 버튼</b> → <b>「다른 브라우저로 열기」</b> 또는 <b>「Safari로 열기」</b></li>' : '<li>오른쪽 위·아래의 <b>⋯ 메뉴</b> → <b>「Safari로 열기」</b> (또는 주소를 복사해 사파리에 붙여넣기)</li>') +
+          '<li>사파리에서 다시 <b>📲 앱으로 설치</b>를 누릅니다.</li></ol>', [isKakao ? ['사파리로 열기', () => openExternal()] : copyBtn, copyBtn, closeBtn].filter((v, i, a) => a.indexOf(v) === i));
+        return;
+      }
+      if (openExternal()) {
+        setTimeout(() => show('<p class="warn">앱 안의 화면에서는 설치할 수 없어 <b>크롬</b>으로 여는 중입니다.</p><p>크롬이 열리지 않으면 ⋮ 메뉴 → <b>「다른 브라우저로 열기」</b>를 누르거나, 주소를 복사해 크롬에 붙여넣으세요.</p>', [copyBtn, closeBtn]), 1200);
+        return;
+      }
+    }
+    if (isIOS) {
+      show(isIOSSafari
+        ? '<ol><li>화면 아래(또는 주소창 옆)의 <b>공유 버튼 ⬆︎</b>을 누릅니다.</li><li>목록을 아래로 내려 <b>「홈 화면에 추가」</b>를 누릅니다.</li><li>오른쪽 위 <b>「추가」</b> → 홈 화면의 <b>사방진</b> 아이콘으로 실행합니다.</li></ol><p>한 번 실행하면 인터넷 없이도 플레이할 수 있습니다.</p>'
+        : '<p class="warn">아이폰은 <b>사파리</b>에서 설치하는 것이 가장 확실합니다.</p><ol><li><b>주소 복사</b>를 누르고 사파리를 엽니다.</li><li>주소창에 붙여넣어 연 뒤 <b>공유 ⬆︎ → 「홈 화면에 추가」</b>를 누릅니다.</li></ol>',
+        [copyBtn, closeBtn]);
+      return;
+    }
+    if (isAndroid) {
+      show(isSamsung
+        ? '<ol><li>화면 아래 <b>≡ 메뉴</b>를 누릅니다.</li><li><b>「현재 페이지 추가」 → 「홈 화면」</b>(또는 「앱 설치」)을 누릅니다.</li><li>홈 화면의 <b>사방진</b> 아이콘으로 실행합니다.</li></ol>'
+        : '<ol><li>오른쪽 위 <b>⋮ 메뉴</b>를 누릅니다.</li><li><b>「앱 설치」</b> 또는 <b>「홈 화면에 추가」 → 「설치」</b>를 누릅니다.</li><li>홈 화면의 <b>사방진</b> 아이콘으로 실행합니다.</li></ol><p>메뉴에 「앱 설치」가 없으면 페이지를 한 번 새로고침한 뒤 10초쯤 기다렸다가 다시 열어 보세요.</p>',
+        [['크롬으로 열기', () => openExternal()], copyBtn, closeBtn].slice(isSamsung ? 0 : 1));
+      return;
+    }
+    show('<ol><li>주소창 오른쪽의 <b>설치 아이콘(⊕ 또는 모니터 모양)</b>을 누릅니다.</li><li>또는 ⋮ 메뉴 → <b>「앱 설치」</b> / <b>「사방진 정령결투 설치」</b>를 누릅니다.</li></ol><p>휴대폰에서는 이 주소를 크롬(안드로이드)이나 사파리(아이폰)로 열어 같은 버튼을 누르세요.</p>', [copyBtn, closeBtn]);
+  });
+  sync();
+})();
+</script>
 <script>
 // 홈 화면 앱: 한 번 받으면 휴대폰에 저장해 두고 인터넷 없이도 실행 (https 주소에서만 동작)
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === '127.0.0.1')) {

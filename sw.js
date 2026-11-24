@@ -1,5 +1,5 @@
 // 사방진 정령결투 홈 화면 앱 — 오프라인 저장 (판 번호가 바뀌면 새 판을 받아 바꿔 끼움)
-const CACHE = 'sabangjin-2.2-1';
+const CACHE = 'sabangjin-2.2-2';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './icons/apple-touch-icon.png', './icons/favicon-64.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
